@@ -284,6 +284,7 @@ def optimize_tp_sl(daily_data: Dict[datetime.date, pd.DataFrame], tp_range, sl_r
 
 def check_breakout(
     current_idx: pd.Timestamp,
+    current_open: float,
     current_close: float,
     current_volume: float,
     current_volume_ema21: float,
@@ -318,14 +319,14 @@ def check_breakout(
     breakout_distance = 0
     breakout_pct_of_or = 0
 
-    if current_close > opening_high:  # Long breakout
+    if (current_close > opening_high) and (current_open < opening_high):  # Long breakout
         breakout_distance = current_close - opening_high
         breakout_pct_of_or = breakout_distance / or_range
         if (min_breakout_pct <= breakout_pct_of_or <= max_breakout_pct) and (volume_pct >= min_volume_pct):
             breakout_occurred = True
             breakout_direction = 'long'
 
-    elif current_close < opening_low:  # Short breakout
+    elif (current_close < opening_low) and (current_open > opening_low):  # Short breakout
         breakout_distance = opening_low - current_close
         breakout_pct_of_or = breakout_distance / or_range
         if (min_breakout_pct <= breakout_pct_of_or <= max_breakout_pct) and (volume_pct >= min_volume_pct):
@@ -524,6 +525,7 @@ def simulate_trade(
 
         breakout_occurred, breakout_dir, breakout_dist, breakout_pct, _ = check_breakout(
             current_idx=current_idx,
+            current_open=safe_float(current_row['Open']),
             current_close=safe_float(current_row['Close']),
             current_volume=safe_float(current_row['Volume']),
             current_volume_ema21=safe_float(current_row['Volume_EMA21']),
@@ -748,6 +750,7 @@ def simulate_rb_trade(
         if breakout_info is None:
             breakout_occurred, breakout_dir, breakout_dist, breakout_pct, breakout_time = check_breakout(
                 current_idx=current_idx,
+                current_open=safe_float(current_row['Open']),
                 current_close=safe_float(current_row['Close']),
                 current_volume=safe_float(current_row['Volume']),
                 current_volume_ema21=safe_float(current_row['Volume_EMA21']),
