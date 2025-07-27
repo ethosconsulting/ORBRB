@@ -1,3 +1,4 @@
+#23. ORBRB
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -65,10 +66,14 @@ with st.sidebar:
     col1, col2 = st.columns(2)
     with col1:
         or_start_hour = st.number_input("OR Start Hour (0-23)", min_value=0, max_value=23, value=14)
-        or_start_minute = st.selectbox("OR Start Minute", options=['00', '15', '30','45'], index=2)
+        or_start_minute = st.selectbox("OR Start Minute",
+                                    options=['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'],
+                                    index=6)  # Default to '30'
     with col2:
-        or_end_hour = st.number_input("OR End Hour (0-23)", min_value=0, max_value=23, value=15)
-        or_end_minute = st.selectbox("OR End Minute", options=['00', '15', '30','45'], index=0)
+        or_end_hour = st.number_input("OR End Hour (0-23)", min_value=0, max_value=23, value=14)
+        or_end_minute = st.selectbox("OR End Minute",
+                                    options=['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'],
+                                    index=11)  # Default to '55' for '30' min close candle for NYC session.
 
     # Date range
     st.subheader("Date Range")
@@ -1159,7 +1164,7 @@ def prepare_download_data(data: pd.DataFrame) -> Tuple[bytes, str]:
         download_data.index = download_data.index.tz_convert(timezone).tz_localize(None)
 
     # Reorder columns to match your preferred format
-    download_data = download_data[['Close', 'High', 'Low', 'Open', 'Volume']]
+    download_data = download_data[['Open', 'High', 'Low', 'Close', 'Volume']]
 
     # Format dates in European style (DD/MM/YYYY)
     download_data.index = download_data.index.strftime('%d/%m/%Y %H:%M')
@@ -1180,7 +1185,7 @@ def process_uploaded_data(uploaded_file, timezone: str, start_date, end_date) ->
         full_data = pd.read_csv(uploaded_file, index_col=0, parse_dates=True, dayfirst=True, skiprows=2)
 
         # Rename columns to match expected format
-        full_data.columns = ['Close', 'High', 'Low', 'Open', 'Volume']
+        full_data.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
 
         # Validate required columns
         required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
@@ -1222,7 +1227,7 @@ if st.sidebar.button("Download Processed Data"):
                 # Show preview in European date format
                 preview_data = processed_data.copy()
                 preview_data.index = preview_data.index.strftime('%d/%m/%Y %H:%M')
-                st.dataframe(preview_data[['Close', 'High', 'Low', 'Open', 'Volume']].head())
+                st.dataframe(preview_data[['Open', 'High', 'Low', 'Close', 'Volume']].head())
 
                 csv_data, file_name = prepare_download_data(processed_data)
 
