@@ -1,4 +1,4 @@
-#24ORBRB
+#24 ORBRB
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -412,11 +412,17 @@ def execute_breakout_trade(
 
     # Calculate entry price with buffer and cost
     if entry_direction == 'long':
-        entry_price = breakout_close + buffer + cost
+        if breakout_requires_close_outside:
+            entry_price = breakout_close + buffer + cost
+        else:
+            entry_price = opening_high + buffer + cost
         tp_price = entry_price + tp_value
         sl_price = entry_price - sl_value
     else:  # short
-        entry_price = breakout_close - buffer - cost
+        if breakout_requires_close_outside:
+            entry_price = breakout_close - buffer - cost
+        else:
+            entry_price = opening_low - buffer - cost
         tp_price = entry_price - tp_value
         sl_price = entry_price + sl_value
 
