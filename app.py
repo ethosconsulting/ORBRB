@@ -1,4 +1,4 @@
-#23. ORBRB
+#24 ORBRB
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -111,6 +111,9 @@ with st.sidebar:
 
     # Breakout Validation Parameters
     st.subheader("Breakout Validation Parameters")
+
+    breakout_requires_close_outside = st.checkbox("Breakout requires close outside OR", value=True)
+
     col1, col2 = st.columns(2)
     with col1:
         min_breakout_pct = st.number_input(
@@ -324,21 +327,32 @@ def check_breakout(
     breakout_distance = 0
     breakout_pct_of_or = 0
 
-    if (current_close > opening_high) and (current_open < opening_high):  # Long breakout
-        breakout_distance = current_close - opening_high
-        breakout_pct_of_or = breakout_distance / or_range
-        if (min_breakout_pct <= breakout_pct_of_or <= max_breakout_pct) and (volume_pct >= min_volume_pct):
+    if breakout_requires_close_outside:
+        if (current_close > opening_high) and (current_open < opening_high):  # Long breakout
+            breakout_distance = current_close - opening_high
+            breakout_pct_of_or = breakout_distance / or_range
+            if (min_breakout_pct <= breakout_pct_of_or <= max_breakout_pct) and (volume_pct >= min_volume_pct):
+                breakout_occurred = True
+                breakout_direction = 'long'
+
+        elif (current_close < opening_low) and (current_open > opening_low):  # Short breakout
+            breakout_distance = opening_low - current_close
+            breakout_pct_of_or = breakout_distance / or_range
+            if (min_breakout_pct <= breakout_pct_of_or <= max_breakout_pct) and (volume_pct >= min_volume_pct):
+                breakout_occurred = True
+                breakout_direction = 'short'
+
+        return breakout_occurred, breakout_direction, breakout_distance, breakout_pct_of_or, current_idx
+        
+    else:
+        if current_high > opening_high:  # Long breakout (touch-based)
             breakout_occurred = True
             breakout_direction = 'long'
-
-    elif (current_close < opening_low) and (current_open > opening_low):  # Short breakout
-        breakout_distance = opening_low - current_close
-        breakout_pct_of_or = breakout_distance / or_range
-        if (min_breakout_pct <= breakout_pct_of_or <= max_breakout_pct) and (volume_pct >= min_volume_pct):
+        elif current_low < opening_low:  # Short breakout (touch-based)
             breakout_occurred = True
             breakout_direction = 'short'
 
-    return breakout_occurred, breakout_direction, breakout_distance, breakout_pct_of_or, current_idx
+        return breakout_occurred, breakout_direction, breakout_distance, breakout_pct_of_or, current_idx      
 
 def check_reversal(
     breakout_time: pd.Timestamp,
