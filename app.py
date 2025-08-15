@@ -1,4 +1,4 @@
-#24 ORBRB
+#24ORBRB
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -292,6 +292,8 @@ def optimize_tp_sl(daily_data: Dict[datetime.date, pd.DataFrame], tp_range, sl_r
 
 def check_breakout(
     current_idx: pd.Timestamp,
+    current_low: float,
+    current_high: float,
     current_open: float,
     current_close: float,
     current_volume: float,
@@ -544,6 +546,8 @@ def simulate_trade(
 
         breakout_occurred, breakout_dir, breakout_dist, breakout_pct, _ = check_breakout(
             current_idx=current_idx,
+            current_low=safe_float(current_row['Low']),
+            current_high=safe_float(current_row['High']),
             current_open=safe_float(current_row['Open']),
             current_close=safe_float(current_row['Close']),
             current_volume=safe_float(current_row['Volume']),
@@ -769,6 +773,8 @@ def simulate_rb_trade(
         if breakout_info is None:
             breakout_occurred, breakout_dir, breakout_dist, breakout_pct, breakout_time = check_breakout(
                 current_idx=current_idx,
+                current_low=safe_float(current_row['Low']),
+                current_high=safe_float(current_row['High']),
                 current_open=safe_float(current_row['Open']),
                 current_close=safe_float(current_row['Close']),
                 current_volume=safe_float(current_row['Volume']),
