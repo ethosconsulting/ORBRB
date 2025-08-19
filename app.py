@@ -1,4 +1,4 @@
-#25 ORBRB
+#24 ORBRB
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -232,36 +232,24 @@ def get_opening_range_levels(data: pd.DataFrame, or_start_hour: int, or_start_mi
 
     return high, low, tr, expected_candles
 
-def optimize_tp_sl_grid_search(daily_data: Dict[datetime.date, pd.DataFrame], 
-                              tp_min: float, tp_max: float, tp_step: float,
-                              sl_min: float, sl_max: float, sl_step: float,
-                              buffer: float, cost: float) -> pd.DataFrame:
-    """Perform grid search optimization for TP/SL values"""
-    # Generate TP/SL ranges
-    tp_range = np.arange(tp_min, tp_max + tp_step, tp_step)
-    sl_range = np.arange(sl_min, sl_max + sl_step, sl_step)
-    
+def optimize_tp_sl(daily_data: Dict[datetime.date, pd.DataFrame], tp_range, sl_range, buffer: float, cost: float) -> pd.DataFrame:
+    """Grid search optimization using absolute TP/SL values"""
     results = []
-    
-    # Iterate through all combinations
+
     for tp_val, sl_val in product(tp_range, sl_range):
-        # Skip poor risk-reward combinations if enabled
+        # Skip poor risk-reward combinations
         if skip_poor_rr and tp_val < sl_val:
             continue
-            
+
         metrics = {
             'tp_value': tp_val,
             'sl_value': sl_val,
             'total_pnl': 0,
             'win_rate': 0,
             'trades': 0,
-            'avg_pnl': 0,
-            'profit_factor': 0
+            'avg_pnl': 0
         }
-        
-        winning_pnl = 0
-        losing_pnl = 0
-        
+
         for date, day_data in daily_data.items():
             high, low, tr, expected_candles = get_opening_range_levels(
                 day_data, or_start_hour, or_start_minute, or_end_hour, or_end_minute,
@@ -269,71 +257,37 @@ def optimize_tp_sl_grid_search(daily_data: Dict[datetime.date, pd.DataFrame],
             )
             if None in (high, low, tr):
                 continue
-                
-            # Simulate both ORB and RB trades based on strategy type
-            trades = []
-            
-            if strategy_type in ["ORB", "Both"]:
-                orb_trade = simulate_trade(
-                    data=day_data,
-                    opening_high=high,
-                    opening_low=low,
-                    atr=tr,
-                    expected_candles=expected_candles,
-                    or_start_hour=or_start_hour,
-                    or_start_minute=or_start_minute,
-                    or_end_hour=or_end_hour,
-                    or_end_minute=or_end_minute,
-                    buffer=buffer,
-                    cost=cost,
-                    tp_value=tp_val,
-                    sl_value=sl_val,
-                    min_breakout_pct=min_breakout_pct,
-                    max_breakout_pct=max_breakout_pct,
-                    min_volume_pct=min_volume_pct
-                )
-                if orb_trade:
-                    trades.append(orb_trade)
-                    
-            if strategy_type in ["RB", "Both"]:
-                rb_trade = simulate_rb_trade(
-                    data=day_data,
-                    opening_high=high,
-                    opening_low=low,
-                    atr=tr,
-                    expected_candles=expected_candles,
-                    or_start_hour=or_start_hour,
-                    or_start_minute=or_start_minute,
-                    or_end_hour=or_end_hour,
-                    or_end_minute=or_end_minute,
-                    buffer=buffer,
-                    cost=cost,
-                    max_reversal_bars=max_reversal_bars,
-                    min_breakout_pct=min_breakout_pct,
-                    max_breakout_pct=max_breakout_pct,
-                    min_volume_pct=min_volume_pct
-                )
-                if rb_trade:
-                    trades.append(rb_trade)
-            
-            # Process trades for this day
-            for trade in trades:
+
+            trade = simulate_trade(
+                data=day_data,
+                opening_high=high,
+                opening_low=low,
+                atr=tr,  # Still calculated but not used for TP/SL
+                expected_candles=expected_candles,
+                tp_value=tp_val,  # Now using absolute value
+                sl_value=sl_val,  # Now using absolute value
+                or_start_hour=or_start_hour,
+                or_start_minute=or_start_minute,
+                or_end_hour=or_end_hour,
+                or_end_minute=or_end_minute,
+                buffer=buffer,
+                cost=cost,
+                max_reversal_bars=max_reversal_bars,
+                min_breakout_pct=min_breakout_pct,
+                max_breakout_pct=max_breakout_pct,
+                min_volume_pct=min_volume_pct
+            )
+
+            if trade:
                 metrics['total_pnl'] += trade['pnl']
                 metrics['win_rate'] += 1 if trade['pnl'] > 0 else 0
                 metrics['trades'] += 1
-                
-                if trade['pnl'] > 0:
-                    winning_pnl += trade['pnl']
-                else:
-                    losing_pnl += abs(trade['pnl'])
-        
-        # Calculate final metrics
+
         if metrics['trades'] > 0:
             metrics['win_rate'] = metrics['win_rate'] / metrics['trades'] * 100
             metrics['avg_pnl'] = metrics['total_pnl'] / metrics['trades']
-            metrics['profit_factor'] = winning_pnl / losing_pnl if losing_pnl > 0 else np.inf
             results.append(metrics)
-    
+
     return pd.DataFrame(results).sort_values('total_pnl', ascending=False)
 
 def check_breakout(
@@ -1316,8 +1270,7 @@ if st.sidebar.button("Download Processed Data"):
         except Exception as e:
             st.error(f"Download failed: {str(e)}")
 
-
-# Main execution block
+# Run Analysis button
 if st.sidebar.button("Run Analysis"):
     with st.spinner("Running analysis..."):
         if data_source == "YFinance":
@@ -1341,55 +1294,7 @@ if st.sidebar.button("Run Analysis"):
         daily_data = split_data_by_day(full_data, start_hour, start_minute, end_hour, end_minute)
         st.success(f"Found {len(daily_data)} trading days in the date range")
 
-        # First run optimization to find best TP/SL values
-        with st.spinner("Running TP/SL optimization..."):
-            optimization_results = optimize_tp_sl_grid_search(
-                daily_data=daily_data,
-                tp_min=tp_min,
-                tp_max=tp_max,
-                tp_step=tp_step,
-                sl_min=sl_min,
-                sl_max=sl_max,
-                sl_step=sl_step,
-                buffer=buffer_pts,
-                cost=cost_pts
-            )
-
-        if not optimization_results.empty:
-            best_combo = optimization_results.iloc[0]
-            optimal_tp = best_combo['tp_value']
-            optimal_sl = best_combo['sl_value']
-            
-            st.success(
-                f"Optimal TP/SL Found: TP={optimal_tp:.1f}, SL={optimal_sl:.1f} "
-                f"(Total P&L: {best_combo['total_pnl']:.2f}, Win Rate: {best_combo['win_rate']:.1f}%)"
-            )
-            
-            # Show optimization visualizations in expander
-            with st.expander("Optimization Details"):
-                st.subheader("Optimization Results")
-                st.write("Top 10 TP/SL Combinations by Total P&L:")
-                st.dataframe(optimization_results.head(10))
-
-                tab1, tab2, tab3 = st.tabs(["Heatmap", "Win Rate", "Efficiency Frontier"])
-                
-                with tab1:
-                    st.subheader("P&L Heatmap")
-                    plot_optimization_heatmap(optimization_results)
-                    
-                with tab2:
-                    st.subheader("Win Rate Heatmap")
-                    plot_win_rate_heatmap(optimization_results)
-                    
-                with tab3:
-                    st.subheader("Efficiency Frontier")
-                    plot_efficiency_frontier(optimization_results)
-        else:
-            st.warning("No valid TP/SL combinations found with the current parameters")
-            optimal_tp = (tp_min + tp_max) / 2  # Default to midpoint if no optimization results
-            optimal_sl = (sl_min + sl_max) / 2
-
-        # Generate trades using optimal TP/SL values
+        # Generate trades
         all_trades = []
         for date, day_data in daily_data.items():
             high, low, tr, expected_candles = get_opening_range_levels(
@@ -1415,8 +1320,6 @@ if st.sidebar.button("Run Analysis"):
                     or_end_minute=or_end_minute,
                     buffer=buffer_pts,
                     cost=cost_pts,
-                    tp_value=optimal_tp,
-                    sl_value=optimal_sl,
                     min_breakout_pct=min_breakout_pct,
                     max_breakout_pct=max_breakout_pct,
                     min_volume_pct=min_volume_pct
@@ -1581,6 +1484,8 @@ if st.sidebar.button("Run Analysis"):
                 st.metric("Short Profit Factor", f"{metrics.get('short_profit_factor', 0):.2f}")
 
 
+            # Add this right before the cumulative PNL curve section in your code
+
             # Add OR Entry Summary section
             st.subheader("OR Entry Summary")
 
@@ -1744,5 +1649,3 @@ if st.sidebar.button("Run Analysis"):
 
                     # Add some spacing between plots
                     st.write("---")
-        else:
-            st.warning("No trades were executed with the current parameters")
