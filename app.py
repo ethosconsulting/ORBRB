@@ -582,8 +582,8 @@ def simulate_trade(
                 breakout_pct_of_or=breakout_pct,
                 volume_pct=safe_float(current_row['Volume']) /
                           safe_float(current_row['Volume_EMA21']),
-                tp_value=6.0,
-                sl_value=6.0
+                tp_value=10.0,
+                sl_value=10.0
             )
             trade_taken_today = True
             return trade
@@ -1649,3 +1649,4 @@ if st.sidebar.button("Run Analysis"):
 
                     # Add some spacing between plots
                     st.write("---")
+
